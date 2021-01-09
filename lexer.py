@@ -68,7 +68,7 @@ SORTED_OPERATOR = reversed(sorted(OPERATOR, key = len))
 
 import re
 ws_regex  = re.compile(r"\s+")
-num_regex = re.compile(r"\d+(\.\d+)?")
+num_regex = re.compile(r"\d+")
 
 
 ################################################################################
@@ -162,20 +162,15 @@ class TokenStream:
 
             tok_line, tok_column = self.line, self.column
 
-            # Is the next token an integer or decimal fraction? ############
+            # Is the next token a natural number? #########################
             # TODO support 0x, 0o, and 0b notation
             match = num_regex.match(self.text)
             if match is not None:
                 numstr= match.group()
-                if "." in numstr:
-                    num = float(numstr)
-                    tok_class = 'float'
-                else:
-                    num = int(numstr)
-                    tok_class = 'integer'
+                num = int(numstr)
                 self._advance(numstr)
                 self.text = self.text[match.end():]
-                return Token(numstr, tok_line, tok_column, num, tok_class)
+                return Token(numstr, tok_line, tok_column, num, 'integer')
 
             # Is the next token a string? ##################################
             if self.text.startswith(STRING_LEFT):
@@ -290,36 +285,22 @@ if __name__ == '__main__':
     #   any of the lexer constants.
 
     try:
-        string = "2 + 2.0"
+        string = "2 + 2.0 -3"
         stream = TokenStream(string)
         output = [next(stream) for _ in range(3)]
-        expected = [Token("2",   1, 1, 2,   'integer' ),
-                    Token("+",   1, 3, '+', 'operator'),
-                    Token("2.0", 1, 5, 2.0, 'float'   )]
+        expected = [Token("2", 1,  1, 2,   'integer' ),
+                    Token("+", 1,  3, '+', 'operator'),
+                    Token("2", 1,  5, 2,   'integer' ),
+                    Token(".", 1,  6, '.', 'operator'),
+                    Token("0", 1,  7, 0,   'integer' ),
+                    Token("-", 1,  9, '-', 'operator'),
+                    Token("3", 1, 10, 3,   'integer' )]
         result = all(a.isexactly(b) for a,b in zip(output, expected))
 
     except Exception:
         result = False
 
     test('basic arithmetic', result)
-
-
-    #try:
-    #    string = "a b? c-d e-?"
-    #    stream = TokenStream(string)
-    #    output = [next(stream) for _ in range(6)]
-    #    expected = [Token("a",   1,  1, 'a',   'word'    ),
-    #                Token("b?",  1,  3, 'b?',  'word'    ),
-    #                Token("c-d", 1,  6, 'c-d', 'word'    ),
-    #                Token("e",   1, 10, 'e',   'word'    ),
-    #                Token("-",   1, 11, '-',   'operator'),
-    #                Token("?",   1, 12, '?',   'operator')]
-    #    result = all(a.isexactly(b) for a,b in zip(output, expected))
-
-    #except Exception:
-    #    result = False
-
-    #test('mid- and end-word symbols', result)
 
 
     try:
@@ -342,6 +323,7 @@ if __name__ == '__main__':
         result = False
 
     test('using callback', result)
+
 
     try:
         # Any run of whitespace including one or more newline

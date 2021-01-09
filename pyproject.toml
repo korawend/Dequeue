@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "queuen"
+version = "1.0.0"
+description = "a quirky little queue-based language"
+authors = ["Your Name <you@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

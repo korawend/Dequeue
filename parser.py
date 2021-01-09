@@ -1,4 +1,4 @@
-import lexer
+import queuen.lexer
 
 class ParseTree:
     def __init__(self, name, leaf, children):

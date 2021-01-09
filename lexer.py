@@ -20,8 +20,8 @@ COMMENT = '#'
 
 # These may be more than one character long.
 #
-OPERATOR = {'!',  '@',  '$',  '%',  '^',  '&',  '*',  '-',  '+',  '|',
-            '!!', '@@', '$$', '%%', '^^', '&&', '**', '--', '++', '||',
+OPERATOR = {'!',  '@',  '$',  '%',  '^',  '&',  '*',  '-',  '+',  '|',  '_',
+            '!!', '@@', '$$', '%%', '^^', '&&', '**', '--', '++', '||', '__',
             '!=', '@=', '$=', '%=', '^=', '&=', '*=', '-=', '+=', '|=',
 
             '<',   '>',   '.',   '=',  ':',  '?',  '/',  '\\',   '~',
@@ -37,9 +37,7 @@ OPERATOR = {'!',  '@',  '$',  '%',  '^',  '&',  '*',  '-',  '+',  '|',
             '←',  '→',  '<=', '=>', '<<=', '=>>', '↓',
                         '≤',  '≥',
 
-            '×', '×=', '÷', '÷=', '⋅', '⋅=', '∘',
-
-            '_'}
+            '×', '×=', '÷', '÷=', '⋅', '⋅=', '∘'}
 
 # Characters that are part of an operator but may also appear as part of a name.
 #   (These must be only one character long.)
@@ -271,75 +269,3 @@ class TokenBuffer:
             self.buffer.append(tok)
         self.length = len(self.buffer)
 
-
-################################################################################
-
-
-if __name__ == '__main__':
-
-    from util import *
-    note("starting lexer unit tests")
-
-    # Tests go here! #######################################################
-    #   These are just examples; be sure to change them if you change
-    #   any of the lexer constants.
-
-    try:
-        string = "2 + 2.0 -3"
-        stream = TokenStream(string)
-        output = [next(stream) for _ in range(3)]
-        expected = [Token("2", 1,  1, 2,   'integer' ),
-                    Token("+", 1,  3, '+', 'operator'),
-                    Token("2", 1,  5, 2,   'integer' ),
-                    Token(".", 1,  6, '.', 'operator'),
-                    Token("0", 1,  7, 0,   'integer' ),
-                    Token("-", 1,  9, '-', 'operator'),
-                    Token("3", 1, 10, 3,   'integer' )]
-        result = all(a.isexactly(b) for a,b in zip(output, expected))
-
-    except Exception:
-        result = False
-
-    test('basic arithmetic', result)
-
-
-    try:
-        def toks():
-            yield "1"
-            yield "2"
-            yield "3"
-        tok_gen = toks()
-        def callback():
-            return next(tok_gen)
-        stream = TokenStream("123", callback)
-        output = [next(stream) for _ in range(4)]
-        expected = [Token("123", 1, 1, 123, 'integer'),
-                    Token("1",   1, 4,   1, 'integer'),
-                    Token("2",   1, 5,   2, 'integer'),
-                    Token("3",   1, 6,   3, 'integer')]
-        result = all(a.isexactly(b) for a,b in zip(output, expected))
-
-    except Exception:
-        result = False
-
-    test('using callback', result)
-
-
-    try:
-        # Any run of whitespace including one or more newline
-        #   characters becomes one newline token, so the
-        #   the following string has 7 tokens.
-        string = "a\nb\n\nc\nd"
-        buf = TokenBuffer(string)
-        buf.complete()
-        expected = Token("c", 4, 1, 'c', 'word')
-        result = (buf[4].isexactly(expected) and len(buf) == 7)
-
-    except Exception:
-        result = False
-
-    test('newlines and buffer', result)
-
-    ########################################################################
-
-    summary()

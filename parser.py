@@ -170,7 +170,8 @@ def prompt():
     return input() + "\n"
 
 stream = TokenStream("", prompt)
-while True:
-    ln = parse_line(stream)
-    print(ln)
+if __name__ == "__main__":
+    while True:
+        ln = parse_line(stream)
+        print(ln)
 

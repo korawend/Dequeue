@@ -466,7 +466,12 @@ def repl():
                 ln.display(stream.log)
                 continue
 
-            gen = to_generator(ln)
+            if isinstance(ln, ParseTree) and ln.kind == 'print':
+                tree = ln
+            else:
+                tree = ParseTree("print", [ln])
+
+            gen = to_generator(tree)
             n = gen.next()
             elems = []
             while True:

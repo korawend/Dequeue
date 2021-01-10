@@ -168,7 +168,7 @@ class TokenStream:
                 num = int(numstr)
                 self._advance(numstr)
                 self.text = self.text[match.end():]
-                return Token(numstr, tok_line, tok_column, num, 'integer')
+                return Token(numstr, tok_line, tok_column, num, 'natural')
 
             # Is the next token a string? ##################################
             if self.text.startswith(STRING_LEFT):
@@ -233,7 +233,7 @@ class TokenStream:
                 word = self.text[:idx]
                 self._advance(word)
                 self.text = self.text[idx:]
-            tok_class = ('keyword' if word in KEYWORD else 'word')
+            tok_class = ('keyword' if word in KEYWORD else 'name')
             return Token(word, tok_line, tok_column, word, tok_class)
 
 

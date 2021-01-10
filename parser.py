@@ -278,7 +278,7 @@ def _parse(line):
         rhs = line[idx+1]
         if isinstance(rhs, Token) and rhs.cls not in AcceptableTokens:
             return ParseError("invalid keyword argument", rhs)
-        tree = ParseTree(line[idx], [rhs])
+        tree = ParseTree(line[idx].val, [rhs])
         line = line[:idx] + [tree] + line[idx+2:]
 
     # And we're all done!

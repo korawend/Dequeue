@@ -4,23 +4,8 @@ from copy import deepcopy
 
 from io import StringIO
 
-from queuen.parser import ParseTree, parse_line, TokenStream
-from queuen.lexer import Token
-
-################################################################################
-
-
-def convertString(string):
-    return [[[] for _ in range(ord(char))] for char in string]
-
-
-def convertNatural(nat):
-    return [[] for _ in range(nat)]
-
-
-def flattenListOnce(lst):
-    return [elem for sub in lst for elem in sub]
-
+from queuen.lexer import Token, TokenStream
+from queuen.parser import ParseTree, ParseError, parse_line
 
 ################################################################################
 
@@ -53,8 +38,6 @@ def literal(lst: List):
 
 def const(i: int):
     class Const(Generator):
-        internal_value = i
-
         def copy(self):
             return const(i)
 
@@ -67,6 +50,22 @@ def const(i: int):
                 return []
             raise StopIteration
     return Const()
+
+
+def string(s: str):
+    class String(Generator):
+        def copy(self):
+            return string(s)
+
+        def refresh(self):
+            self.at = 0
+
+        def next(self):
+            if self.at < len(s):
+                v = [[] for _ in range(ord(s[self.at]))]
+                self.at += 1
+                return v
+            raise StopIteration
 
 
 def factory(it):
@@ -111,6 +110,7 @@ def zip(it1, it2):
             rhs = it2.next()
             return concat(lhs, rhs)
     return Zip()
+
 
 def flatten(it):
     it = it.copy()
@@ -303,11 +303,16 @@ class TestEval:
             self._test(n, 3, three)
 
 
+################################################################################
+
+
 def to_generator(tree):
     if isinstance(tree, Token):
         token = tree
         if token.cls == "natural":
             return const(token.val)
+        elif token.cls == "string":
+            return string(token.val)
         else:
             raise NotImplementedError
     elif isinstance(tree, ParseTree):
@@ -331,6 +336,7 @@ def to_generator(tree):
             raise NotImplementedError
     else:
         raise NotImplementedError
+
 
 class TestToGenerator:
     def test_pass(self):
@@ -406,6 +412,9 @@ class TestToGenerator:
                 [n.next() for _ in range(6)]
 
 
+################################################################################
+
+
 def execute(tree, stdout):
     it = to_generator(tree)
     n = it.next()
@@ -417,6 +426,7 @@ def execute(tree, stdout):
             break
     stdout.write("%d" % len(elems))
     stdout.write("\n")
+
 
 class TestExecute:
     def test_pass(self):
@@ -431,3 +441,47 @@ class TestExecute:
         execute(tree, stdout)
 
         assert stdout.getvalue() == "3\n"
+
+
+################################################################################
+
+
+def repl():
+
+    from sys import exit
+
+    def prompt():
+        print("\x1B[2mqueuen>\x1B[22m ", end='')
+        line = input()
+        if line in ['exit', 'quit']:
+            exit()
+        return line + "\n"
+
+    stream = TokenStream("", prompt)
+
+    try:
+        while True:
+            ln = parse_line(stream)
+            if isinstance(ln, ParseError):
+                ln.display(stream.log)
+                continue
+
+            gen = to_generator(ln)
+            n = gen.next()
+            elems = []
+            while True:
+                try:
+                    elems.append(n.next())
+                except StopIteration:
+                    break
+            print("%d" % len(elems))
+
+    except KeyboardInterrupt:
+        print("\b\b")
+
+    except EOFError:
+        print('exit')
+
+
+if __name__ == '__main__':
+    repl()

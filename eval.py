@@ -2,6 +2,8 @@ import pytest
 from typing import List
 from copy import deepcopy
 
+from io import StringIO
+
 from queuen.parser import ParseTree
 from queuen.lexer import Token
 
@@ -261,6 +263,7 @@ def to_generator(tree):
         if tree.kind == "print":
             rest = to_generator(tree.children[0])
             return proj(rest)
+
         else:
             raise NotImplementedError
     else:
@@ -288,3 +291,29 @@ class TestToGenerator:
         n = it.next()
         with pytest.raises(StopIteration):
             [n.next() for _ in range(3)]
+
+def execute(tree, stdout):
+    it = to_generator(tree)
+    n = it.next()
+    elems = []
+    while True:
+        try:
+            elems.append(n.next())
+        except StopIteration:
+            break
+    stdout.write("%d" % len(elems))
+    stdout.write("\n")
+
+class TestExecute:
+    def test_pass(self):
+        pass
+
+    def test_print(self):
+        tree = ParseTree("print", [
+            Token("3", 0, 0, 3, "natural")
+        ])
+
+        stdout = StringIO()
+        execute(tree, stdout)
+
+        assert stdout.getvalue() == "3\n"

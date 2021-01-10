@@ -1,5 +1,6 @@
 import pytest
-from typing import Iterable
+from typing import List
+from copy import deepcopy
 
 from queuen.parser import ParseTree
 from queuen.lexer import Token
@@ -10,6 +11,23 @@ class Generator:
 
     def refresh(self):
         pass
+
+def literal(lst: List):
+    lst = deepcopy(lst)
+    class Literal(Generator):
+        def copy(self):
+            return literal(lst)
+
+        def refresh(self):
+            self.at = 0
+
+        def next(self):
+            if self.at < len(lst):
+                v = lst[self.at]
+                self.at += 1
+                return v
+            raise StopIteration
+    return Literal()
 
 def const(i: int):
     class Const(Generator):
@@ -50,6 +68,21 @@ def concat(it1, it2):
             except StopIteration:
                 return it2.next()
     return Concat()
+
+stdzip = zip
+def zip(it1, it2):
+    it1 = it1.copy()
+    it2 = it2.copy()
+
+    class Zip(Generator):
+        def copy(self):
+            return zip(it1.copy(), it2.copy())
+
+        def next(self):
+            lhs = it1.next()
+            rhs = it2.next()
+            return concat(lhs, rhs)
+    return Zip()
 
 def take(n):
     def f(it):
@@ -131,4 +164,56 @@ class TestEval:
         for _ in range(100):
             n = it.next()
             self._test(n, 6, StopIteration)
+
+    def test_literal(self):
+        it = literal([1, 2, 3])
+        self._test(it, 3, [1, 2, 3])
+
+    def test_literal_concat(self):
+        it1 = literal([1, 2, 3])
+        it2 = literal([4, 5, 6])
+        it = concat(it1, it2)
+        self._test(it, 6, [1, 2, 3, 4, 5, 6])
+
+    def test_literal_factory(self):
+        it1 = literal([1, 2, 3])
+        it = factory(it1)
+
+        for _ in range(100):
+            n = it.next()
+            self._test(n, 3, [1, 2, 3])
+
+    def test_literal_concat_factory(self):
+        it1 = literal([1, 2, 3])
+        it2 = literal([4, 5, 6])
+        it = factory(concat(it1, it2))
+
+        for _ in range(100):
+            n = it.next()
+            self._test(n, 3, [1, 2, 3])
+
+        for _ in range(100):
+            n = it.next()
+            self._test(n, 6, [1, 2, 3, 4, 5, 6])
+
+        for _ in range(100):
+            n = it.next()
+            self._test(n, 7, StopIteration)
+
+    def test_literal_factory_zip(self):
+        it1 = factory(literal([1, 2, 3]))
+        it2 = factory(literal([4, 5, 6]))
+        it = zip(it1, it2)
+
+        for _ in range(100):
+            n = it.next()
+            self._test(n, 3, [1, 2, 3])
+
+        for _ in range(100):
+            n = it.next()
+            self._test(n, 6, [1, 2, 3, 4, 5, 6])
+
+        for _ in range(100):
+            n = it.next()
+            self._test(n, 7, StopIteration)
 

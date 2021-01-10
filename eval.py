@@ -84,6 +84,26 @@ def zip(it1, it2):
             return concat(lhs, rhs)
     return Zip()
 
+def proj(it):
+    # get nth element of iterator
+    # TODO: currently only gets the first element
+    it = it.copy()
+
+    class Proj(Generator):
+        def copy(self):
+            return proj(it)
+
+        def refresh(self):
+            self.at = 0
+
+        def next(self):
+            if self.at == 0:
+                self.at += 1
+                return it.copy()
+            raise StopIteration
+
+    return Proj()
+
 def take(n):
     def f(it):
         return [it.next() for _ in range(n)]
@@ -217,3 +237,54 @@ class TestEval:
             n = it.next()
             self._test(n, 7, StopIteration)
 
+    def test_proj_1(self):
+        it1 = factory(literal([1, 2, 3]))
+        it2 = factory(literal([4, 5, 6]))
+        it = proj(zip(it1, it2))
+        n = it.next()
+        while isinstance(n, Generator):
+            n = n.next()
+
+        assert n == 1
+
+        with pytest.raises(StopIteration):
+            print(it.next())
+
+def to_generator(tree):
+    if isinstance(tree, Token):
+        token = tree
+        if token.cls == "natural":
+            return const(token.val)
+        else:
+            raise NotImplementedError
+    elif isinstance(tree, ParseTree):
+        if tree.kind == "print":
+            rest = to_generator(tree.children[0])
+            return proj(rest)
+        else:
+            raise NotImplementedError
+    else:
+        raise NotImplementedError
+
+class TestToGenerator:
+    def test_pass(self):
+        pass
+
+    def test_print(self):
+        tree = ParseTree("print", [
+            Token("3", 0, 0, 3, "natural")
+        ])
+
+        it = to_generator(tree)
+        n = it.next()
+        assert [n.next() for _ in range(3)] == three
+
+    def test_print_exception(self):
+        tree = ParseTree("print", [
+            Token("2", 0, 0, 2, "natural")
+        ])
+
+        it = to_generator(tree)
+        n = it.next()
+        with pytest.raises(StopIteration):
+            [n.next() for _ in range(3)]

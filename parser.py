@@ -11,7 +11,7 @@ class ParseTree:
         self.children = children    # list of ParseTrees or literal values
 
     def __repr__(self):
-        tk = "\x1B[38;5;128mParseTree\x1B[39m"
+        tk = "\x1B[38;5;129mParseTree\x1B[39m"
         return f"⟨{tk} {self.kind} = {self.children}⟩"
 
 class ParseError:

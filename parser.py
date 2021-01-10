@@ -60,7 +60,22 @@ class ParseError:
             print("~"*(right-left-1), end='')
             print("\x1B[39m")
         else:
-            pass    # TODO
+            print(margin, end='')
+            colors = ["\x1B[94m", "\x1B[93m", "\x1B[96m", "\x1B[95m"]
+            color_idx = 0
+            position = 0
+            for block in self.highlight:
+                tokens = extract_tokens(block)
+                if len(tokens) > 0:
+                    left = tokens[0].col - 1
+                    right = tokens[-1].col - 1 + len(tokens[-1].txt)
+                    print(" " * (left-position), end='')
+                    print(colors[color_idx]+"^", end='')
+                    print("~"*(right-left-1), end='')
+                    print("\x1B[39m", end='')
+                    color_idx = (color_idx + 1) % len(colors)
+                    position += right-position
+            print()
 
 
 ################################################################################

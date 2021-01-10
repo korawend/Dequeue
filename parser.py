@@ -8,22 +8,40 @@ from queuen.lexer import KEYWORD as Keywords
 class ParseTree:
     def __init__(self, kind, children):
         self.kind = kind            # instance of str
-        self.children = children    # list of ParseTrees or literal values
+        self.children = children    # list of ParseTrees or Tokens
 
     def __repr__(self):
         tk = "\x1B[38;5;129mParseTree\x1B[39m"
         return f"⟨{tk} {self.kind} = {self.children}⟩"
 
+
+def extract_tokens(obj):
+    if isinstance(obj, Token):
+        return [obj]
+    if isinstance(obj, ParseTree):
+        obj = obj.children
+    if isinstance(obj, list):
+        out = []
+        for x in obj:
+            out.append(extract_tokens(x))
+        return out
+    return []
+
+
 class ParseError:
-    def __init__(self, msg, ctx):
-        self.message = msg          # instance of str
-        self.context = ctx          # instance of ParseTree or Token,
+    def __init__(self, msg, hi, redux = False):
+        self.message   = msg        # instance of str
+        self.highlight = hi         # instance of ParseTree or Token,
                                     #   or a list of ParseTrees and Tokens
+        self.redux     = redux      # whether this is a reducability error
 
     def __repr__(self):
-        return "\x1B[91merror\x1B[39m: " + self.message + "\n" + str(self.context)
-        # TODO this needs to be significantly improved
-
+        fmtd = "\x1B[91merror\x1B[39m: " + self.message #+ "\n"
+        if not self.redux:
+            pass    # TODO
+        else:
+            pass    # TODO
+        return fmtd
 
 ################################################################################
 
@@ -74,6 +92,11 @@ def split_token(ln, val, cls = 'separator'):
 ################################################################################
 
 
+# These are acceptable arguments to operators and built-ins.
+#
+AcceptableTokens = {'natural', 'string', 'name'}
+
+
 # Arranged from high to low precedence.
 #   Each element looks like [op, 'left'|'right', kind]     for binary ops
 #                       and [op, 'prefix'|'postfix', kind] for unary ops
@@ -93,12 +116,12 @@ def _parse(line):
     while (lp := index_token(line, "(", 'delimiter')) is not None:
         rp = index_token(line, ")", 'delimiter')
         if (rp is not None) and rp < lp:
-            return ParseError("missing left parenthesis", line)
+            return ParseError("missing left parenthesis", line[rp])
         height = 1
         rp = lp + 1
         while True:
             if rp >= len(line):
-                return ParseError("missing right parenthesis", line)
+                return ParseError("missing right parenthesis", line[lp])
             obj = line[rp]
             if isinstance(obj, Token) and obj.cls == 'delimiter':
                 if obj.val == '(': height += 1
@@ -108,7 +131,7 @@ def _parse(line):
 
         interior = _parse(line[lp+1:rp])
         if interior is None:
-            return ParseError("nothing to parse inside parentheses", None)
+            return ParseError("nothing to parse inside parentheses", line[lp:rp+1])
         if isinstance(interior, ParseError):
             return interior
 
@@ -120,12 +143,12 @@ def _parse(line):
     while (lb := index_token(line, "[", 'delimiter')) is not None:
         rb = index_token(line, "]", 'delimiter')
         if (rb is not None) and rb < lb:
-            return ParseError("missing left bracket", line)
+            return ParseError("missing left bracket", line[rb])
         height = 1
         rb = lb + 1
         while True:
             if rb >= len(line):
-                return ParseError("missing right bracket", line)
+                return ParseError("missing right bracket", line[lb])
             obj = line[rb]
             if isinstance(obj, Token) and obj.cls == 'delimiter':
                 if obj.val == '[': height += 1
@@ -150,7 +173,8 @@ def _parse(line):
 
         elif len(interior) > 1:
             if None in interior:
-                return ParseError("missing element", line)
+                idx = interior.index(None)
+                return ParseError("missing element", interior)
 
         literal = ParseTree('literal', interior)
         line = line[:lb] + [literal] + line[rb+1:]
@@ -158,9 +182,9 @@ def _parse(line):
     # At this point, we're guaranteed that aren't any parentheses or brackets.
     # Second, complain about any braces, since they don't do anything yet.
 
-    if (index_token(line, "{", 'delimiter') is not None) \
-            or (index_token(line, "}", 'delimiter') is not None):
-        return ParseError("illegal delimiter", line)
+    if (idx := index_token(line, "{", 'delimiter') is not None) \
+            or (idx := index_token(line, "}", 'delimiter') is not None):
+        return ParseError("illegal delimiter", line[idx])
 
     # Third, parse operators and application (concatenation).
     for op, assoc, kind in Operators:
@@ -173,15 +197,15 @@ def _parse(line):
                 if idx is None:
                     break
                 if idx == 0:
-                    return ParseError("binary operator missing left argument", line)
+                    return ParseError("binary operator missing left argument", line[idx])
                 if idx == len(line)-1:
-                    return ParseError("binary operator missing right argument", line)
+                    return ParseError("binary operator missing right argument", line[idx])
                 lhs = line[idx-1]
                 rhs = line[idx+1]
-                if isinstance(lhs, Token) and lhs.cls not in ['natural', 'string', 'name']:
-                    return ParseError("invalid left argument", line)
-                if isinstance(rhs, Token) and rhs.cls not in ['natural', 'string', 'name']:
-                    return ParseError("invalid right argument", line)
+                if isinstance(lhs, Token) and lhs.cls not in AcceptableTokens:
+                    return ParseError("invalid left argument", lhs)
+                if isinstance(rhs, Token) and rhs.cls not in AcceptableTokens:
+                    return ParseError("invalid right argument", rhs)
                 tree = ParseTree(kind, [lhs, rhs])
                 line = line[:idx-1] + [tree] + line[idx+2:]
 
@@ -194,15 +218,15 @@ def _parse(line):
                 if idx is None:
                     break
                 if idx == 0 and assoc == 'postfix':
-                    return ParseError("postfix operator missing argument", line)
+                    return ParseError("postfix operator missing argument", line[idx])
                 if idx == len(line)-1 and assoc == 'prefix':
-                    return ParseError("prefix operator missing argument", line)
+                    return ParseError("prefix operator missing argument", line[idx])
                 if assoc == 'postfix':
                     arg = line[idx-1]
                 if assoc == 'prefix':
                     arg = line[idx+1]
-                if isinstance(arg, Token) and arg.cls not in ['natural', 'string', 'name']:
-                    return ParseError(f"invalid {assoc} argument", line)
+                if isinstance(arg, Token) and arg.cls not in AcceptableTokens:
+                    return ParseError(f"invalid {assoc} argument", arg)
                 tree = ParseTree(kind, [arg])
                 if assoc == 'postfix':
                     line = line[:idx-1] + [tree] + line[idx+1:]
@@ -215,10 +239,10 @@ def _parse(line):
         if idx is None:
             break
         if idx == len(line)-1:
-            return ParseError("keyword missing argument", line)
+            return ParseError("keyword missing argument", line[idx])
         rhs = line[idx+1]
-        if isinstance(rhs, Token) and rhs.cls not in ['natural', 'string', 'name']:
-            return ParseError("invalid keyword argument", line)
+        if isinstance(rhs, Token) and rhs.cls not in AcceptableTokens:
+            return ParseError("invalid keyword argument", rhs)
         tree = ParseTree(line[idx], [rhs])
         line = line[:idx] + [tree] + line[idx+2:]
 
@@ -226,7 +250,7 @@ def _parse(line):
     if len(line) < 1:
         raise Exception("this should never happen")
     if len(line) > 1:
-        return ParseError("undreducable expression", line)
+        return ParseError("undreducable expression", line, True)
 
     return line[0]
 

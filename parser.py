@@ -23,7 +23,7 @@ def extract_tokens(obj):
     if isinstance(obj, list):
         out = []
         for x in obj:
-            out.append(extract_tokens(x))
+            out += extract_tokens(x)
         return out
     return []
 
@@ -39,6 +39,7 @@ class ParseError:
         fmtd = "\x1B[91merror\x1B[39m: " + self.message #+ "\n"
         if not self.redux:
             pass    # TODO
+            fmtd += "\n" + str(extract_tokens(self.highlight))
         else:
             pass    # TODO
         return fmtd

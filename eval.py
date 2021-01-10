@@ -18,7 +18,7 @@ def convertNatural(nat):
     return [[] for _ in range(nat)]
 
 
-def flattenList(lst):
+def flattenListOnce(lst):
     return [elem for sub in lst for elem in sub]
 
 

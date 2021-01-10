@@ -116,6 +116,8 @@ class TokenStream:
         self.column = 1
         self.last_emitted_newline = False
 
+        self.log = text
+
     def _advance(self, string):
         newlines = string.count("\n")
         if newlines == 0:
@@ -140,7 +142,9 @@ class TokenStream:
             if self.text == "":
                 if self.more is None:
                     return None
-                self.text += self.more()
+                continuation = self.more()
+                self.text += continuation
+                self.log  += continuation
 
             # Is this a comment? ###########################################
             if self.text.startswith(COMMENT):
@@ -152,7 +156,9 @@ class TokenStream:
                     self.text = ""
                     if self.more is None:
                         return None
-                    self.text += self.more()
+                    continuation = self.more()
+                    self.text += continuation
+                    self.log  += continuation
 
             ################################################################
             # At this point, we're guaranteed not to return a newline,
@@ -188,7 +194,9 @@ class TokenStream:
                     except Exception:
                         if self.more is None:
                             raise Exception("unterminated string")
-                        self.text += self.more()
+                        continuation = self.more()
+                        self.text += continuation
+                        self.log  += continuation
                 string = self.text[:idx]
                 self._advance(string+STRING_RIGHT)
                 self.text = self.text[idx+len(STRING_RIGHT):]

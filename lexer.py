@@ -264,6 +264,9 @@ class TokenBuffer:
                 self.buffer.append(next(self.stream))
         return self.buffer[idx]
 
+    def freeze(self):
+        self.length = len(self.buffer)
+
     def complete(self):
         while (tok := next(self.stream)) is not None:
             self.buffer.append(tok)

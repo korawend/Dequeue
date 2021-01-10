@@ -4,7 +4,7 @@ from copy import deepcopy
 
 from io import StringIO
 
-from queuen.parser import ParseTree
+from queuen.parser import ParseTree, parse_line, TokenStream
 from queuen.lexer import Token
 
 ################################################################################
@@ -37,7 +37,7 @@ def literal(lst: List):
     lst = deepcopy(lst)
     class Literal(Generator):
         def copy(self):
-            return literal(lst)
+            return literal(deepcopy(lst))
 
         def refresh(self):
             self.at = 0
@@ -53,6 +53,8 @@ def literal(lst: List):
 
 def const(i: int):
     class Const(Generator):
+        internal_value = i
+
         def copy(self):
             return const(i)
 
@@ -70,7 +72,7 @@ def const(i: int):
 def factory(it):
     class Factory(Generator):
         def copy(self):
-            return factory(it)
+            return factory(it.copy())
 
         def next(self):
             return it.copy()
@@ -109,6 +111,13 @@ def zip(it1, it2):
             rhs = it2.next()
             return concat(lhs, rhs)
     return Zip()
+
+def flatten(it):
+    it = it.copy()
+
+    class Flatten(Generator):
+        def copy(self):
+            return flatten(it.copy())
 
 
 def proj(it):
@@ -282,8 +291,16 @@ class TestEval:
         with pytest.raises(StopIteration):
             print(it.next())
 
+    @pytest.mark.skip
+    def test_zip_right_infinite(self):
+        it1 = const(2)
+        it2 = factory(const(3))
+        it = zip(it1, it2)
 
-################################################################################
+        for _ in range(100):
+            n = it.next()
+            print(n)
+            self._test(n, 3, three)
 
 
 def to_generator(tree):
@@ -295,9 +312,21 @@ def to_generator(tree):
             raise NotImplementedError
     elif isinstance(tree, ParseTree):
         if tree.kind == "print":
-            rest = to_generator(tree.children[0])
-            return proj(rest)
-
+            return proj(to_generator(tree.children[0]))
+        elif tree.kind == "concat":
+            return concat(
+                to_generator(tree.children[0]),
+                to_generator(tree.children[1])
+            )
+        elif tree.kind == "zip":
+            return zip(
+                to_generator(tree.children[0]),
+                to_generator(tree.children[1])
+            )
+        elif tree.kind == "factory":
+            return factory(
+                to_generator(tree.children[0])
+            )
         else:
             raise NotImplementedError
     else:
@@ -325,6 +354,57 @@ class TestToGenerator:
         n = it.next()
         with pytest.raises(StopIteration):
             [n.next() for _ in range(3)]
+
+    def test_concat(self):
+        tree = ParseTree("concat", [
+            Token("3", 0, 0, 3, "natural"),
+            Token("2", 0, 0, 2, "natural")
+        ])
+
+        it = to_generator(tree)
+        assert [it.next() for _ in range(5)] == five
+
+        it = to_generator(tree)
+        with pytest.raises(StopIteration):
+            [it.next() for _ in range(6)]
+
+    def test_factory(self):
+        tree = ParseTree("factory", [
+            Token("3", 0, 0, 3, "natural"),
+        ])
+
+        it = to_generator(tree)
+        n = it.next()
+
+        for _ in range(100):
+            assert [n.next() for _ in range(3)] == three
+            n = it.next()
+
+        for _ in range(100):
+            with pytest.raises(StopIteration):
+                [n.next() for _ in range(4)]
+
+    def test_zip(self):
+        tree = ParseTree("zip", [
+            ParseTree("factory", [
+                Token("3", 0, 0, 3, "natural"),
+            ]),
+            ParseTree("factory", [
+                Token("5", 0, 0, 2, "natural"),
+            ])
+        ])
+
+        it = to_generator(tree)
+        n = it.next()
+
+        for _ in range(100):
+            assert [n.next() for _ in range(5)] == five
+            n = it.next()
+
+        for _ in range(100):
+            with pytest.raises(StopIteration):
+                [n.next() for _ in range(6)]
+
 
 def execute(tree, stdout):
     it = to_generator(tree)

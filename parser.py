@@ -76,6 +76,9 @@ def _parse(line):
         return None
 
     while (lp := index_token(line, "(")) is not None:
+        rp = index_token(line, ")")
+        if (rp is not None) and rp < lp:
+            return ParseError("missing left parenthesis", line)
         height = 1
         rp = lp + 1
         while True:
@@ -100,6 +103,9 @@ def _parse(line):
     # First, construct queue literals.
 
     while (lb := index_token(line, "[")) is not None:
+        rb = index_token(line, "]")
+        if (rb is not None) and rb < lb:
+            return ParseError("missing left bracket", line)
         height = 1
         rb = lb + 1
         while True:

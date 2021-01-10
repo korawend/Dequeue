@@ -36,13 +36,32 @@ class ParseError:
         self.redux     = redux      # whether this is a reducability error
 
     def __repr__(self):
-        fmtd = "\x1B[91merror\x1B[39m: " + self.message #+ "\n"
+        return "\x1B[91merror\x1B[39m: " + self.message
+
+    def display(self, log):
+        tokens = extract_tokens(self.highlight)
+        if len(tokens) < 1:
+            print("\x1B[91merror\x1B[39m: " + self.message)
+            return
+        top = tokens[0].ln - 1
+        bot = tokens[-1].ln - 1
+        if bot-top > 1:
+            return  # not sure how to display multi-line errors
+                    #   (but fortunately, there aren't any yet)
+        print(f"\x1B[91merror\x1B[39m: line {tokens[0].ln}: " + self.message)
+        line = (log.split("\n"))[top]
+        margin = "\x1B[2m\u2502\x1B[22m "
+        print(margin)
+        print(margin + line)
         if not self.redux:
-            pass    # TODO
-            fmtd += "\n" + str(extract_tokens(self.highlight))
+            left = tokens[0].col - 1                         # inclusive
+            right = tokens[-1].col - 1 + len(tokens[-1].txt) # exclusive
+            print(margin + " "*left + "\x1B[91m^", end='')
+            print("~"*(right-left-1), end='')
+            print("\x1B[39m")
         else:
             pass    # TODO
-        return fmtd
+
 
 ################################################################################
 
@@ -175,7 +194,7 @@ def _parse(line):
         elif len(interior) > 1:
             if None in interior:
                 idx = interior.index(None)
-                return ParseError("missing element", interior)
+                return ParseError("extraneous delimiter", line[lb+1:rb])
 
         literal = ParseTree('literal', interior)
         line = line[:lb] + [literal] + line[rb+1:]
@@ -287,7 +306,10 @@ if __name__ == "__main__":
     try:
         while True:
             ln = parse_line(stream)
-            print(ln)
+            if isinstance(ln, ParseError):
+                ln.display(stream.log)
+            else:
+                print(ln)
 
     except KeyboardInterrupt:
         print("\b\bexit")

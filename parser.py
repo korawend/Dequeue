@@ -86,7 +86,6 @@ def _parse(line):
                 if obj.val == '(': height += 1
                 if obj.val == ')': height -= 1
             if height == 0: break
-            if height < 0: return ParseError("unmatched right parenthesis", line)
             rp += 1
 
         interior = _parse(line[lp+1:rp])
@@ -111,18 +110,26 @@ def _parse(line):
                 if obj.val == '[': height += 1
                 if obj.val == ']': height -= 1
             if height == 0: break
-            if height < 0: return ParseError("unmatched right bracket", line)
             rb += 1
 
         elems = split_token(line[lb+1:rb], ",")
         interior = []
         for elem in elems:
             parsed_elem = _parse(elem)
-            if parsed_elem is None:
-                pass    # TODO what should actually happen here?
             if isinstance(parsed_elem, ParseError):
                 return parsed_elem
             interior.append(parsed_elem)
+
+        if len(interior) < 1:
+            raise Exception("this should never happen")
+
+        elif len(interior) == 1:
+            if interior[0] is None:
+                interior = []
+
+        elif len(interior) > 1:
+            if None in interior:
+                pass    # TODO what should actually happen here? e.g. [0,,0]
 
         literal = ParseTree('literal', interior)
         line = line[:lb] + [literal] + line[rb+1:]

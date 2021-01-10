@@ -7,12 +7,31 @@ from io import StringIO
 from queuen.parser import ParseTree
 from queuen.lexer import Token
 
+################################################################################
+
+
+def convertString(string):
+    return [[[] for _ in range(ord(char))] for char in string]
+
+
+def convertNatural(nat):
+    return [[] for _ in range(nat)]
+
+
+def flattenList(lst):
+    return [elem for sub in lst for elem in sub]
+
+
+################################################################################
+
+
 class Generator:
     def __init__(self):
         self.refresh()
 
     def refresh(self):
         pass
+
 
 def literal(lst: List):
     lst = deepcopy(lst)
@@ -31,6 +50,7 @@ def literal(lst: List):
             raise StopIteration
     return Literal()
 
+
 def const(i: int):
     class Const(Generator):
         def copy(self):
@@ -46,6 +66,7 @@ def const(i: int):
             raise StopIteration
     return Const()
 
+
 def factory(it):
     class Factory(Generator):
         def copy(self):
@@ -55,6 +76,7 @@ def factory(it):
             return it.copy()
 
     return Factory()
+
 
 def concat(it1, it2):
     it1 = it1.copy()
@@ -71,7 +93,9 @@ def concat(it1, it2):
                 return it2.next()
     return Concat()
 
+
 stdzip = zip
+
 def zip(it1, it2):
     it1 = it1.copy()
     it2 = it2.copy()
@@ -85,6 +109,7 @@ def zip(it1, it2):
             rhs = it2.next()
             return concat(lhs, rhs)
     return Zip()
+
 
 def proj(it):
     # get nth element of iterator
@@ -106,10 +131,15 @@ def proj(it):
 
     return Proj()
 
+
 def take(n):
     def f(it):
         return [it.next() for _ in range(n)]
     return f
+
+
+################################################################################
+
 
 take1 = take(1)
 take2 = take(2)
@@ -251,6 +281,10 @@ class TestEval:
 
         with pytest.raises(StopIteration):
             print(it.next())
+
+
+################################################################################
+
 
 def to_generator(tree):
     if isinstance(tree, Token):

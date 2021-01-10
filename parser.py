@@ -1,5 +1,9 @@
 from queuen.lexer import Token, TokenStream
+from queuen.lexer import KEYWORD as Keywords
 
+# The token classes are  newline   ,  natural ,  string    ,
+#                        delimiter ,  special ,  separator ,  operator
+#                        keyword   ,  name
 
 class ParseTree:
     def __init__(self, kind, children):
@@ -17,29 +21,37 @@ class ParseError:
                                     #   or a list of ParseTrees and Tokens
 
     def __repr__(self):
-        return "\x1B[91merror\x1B[39m: " + self.message
+        return "\x1B[91merror\x1B[39m: " + self.message + "\n" + str(self.context)
         # TODO this needs to be significantly improved
 
 
 ################################################################################
 
 
-def index_token(ln, val, cls = 'delimiter'):
+def index_token(ln, val, cls):
     idx = 0
     while idx < len(ln):
         obj = ln[idx]
-        if isinstance(obj, Token) and obj.cls == cls and obj.val == val:
-            return idx
+        if isinstance(obj, Token):
+            setlike_cls = (isinstance(cls, set) or isinstance(cls, list))
+            if obj.cls == cls or (setlike_cls and obj.cls in cls):
+                setlike_val = (isinstance(val, set) or isinstance(val, list))
+                if obj.val == val or (setlike_val and obj.val in val):
+                    return idx
         idx += 1
     return None
 
 
-def rindex_token(ln, val, cls = 'delimiter'):
+def rindex_token(ln, val, cls):
     idx = len(ln)-1
     while idx >= 0:
         obj = ln[idx]
-        if isinstance(obj, Token) and obj.cls == cls and obj.val == val:
-            return idx
+        if isinstance(obj, Token):
+            setlike_cls = (isinstance(cls, set) or isinstance(cls, list))
+            if obj.cls == cls or (setlike_cls and obj.cls in cls):
+                setlike_val = (isinstance(val, set) or isinstance(val, list))
+                if obj.val == val or (setlike_val and obj.val in val):
+                    return idx
         idx -= 1
     return None
 
@@ -62,11 +74,14 @@ def split_token(ln, val, cls = 'separator'):
 ################################################################################
 
 
-# Arranged from high to low.
-#   Each element looks like [op, 'unary'|'binary', 'left'|'right'].
+# Arranged from high to low precedence.
+#   Each element looks like [op, 'left'|'right', kind]     for binary ops
+#                       and [op, 'prefix'|'postfix', kind] for unary ops
 #
-OperatorPrecedence = []
-
+Operators = [[':', 'left',   'concat' ],
+             ['$', 'prefix', 'factory'],
+             ['~', 'left',   'zip'    ],
+             ['_', 'prefix', 'flatten']]
 
 # Returns None, an instance of ParseTree, or an instance of ParseError.
 #
@@ -75,8 +90,8 @@ def _parse(line):
     if len(line) == 0:
         return None
 
-    while (lp := index_token(line, "(")) is not None:
-        rp = index_token(line, ")")
+    while (lp := index_token(line, "(", 'delimiter')) is not None:
+        rp = index_token(line, ")", 'delimiter')
         if (rp is not None) and rp < lp:
             return ParseError("missing left parenthesis", line)
         height = 1
@@ -102,8 +117,8 @@ def _parse(line):
     # And now, at this point, we're guaranteed that aren't any parentheses.
     # First, construct queue literals.
 
-    while (lb := index_token(line, "[")) is not None:
-        rb = index_token(line, "]")
+    while (lb := index_token(line, "[", 'delimiter')) is not None:
+        rb = index_token(line, "]", 'delimiter')
         if (rb is not None) and rb < lb:
             return ParseError("missing left bracket", line)
         height = 1
@@ -135,7 +150,7 @@ def _parse(line):
 
         elif len(interior) > 1:
             if None in interior:
-                pass    # TODO what should actually happen here? e.g. [0,,0]
+                return ParseError("missing element", line)
 
         literal = ParseTree('literal', interior)
         line = line[:lb] + [literal] + line[rb+1:]
@@ -143,15 +158,75 @@ def _parse(line):
     # At this point, we're guaranteed that aren't any parentheses or brackets.
     # Second, complain about any braces, since they don't do anything yet.
 
-    if (index_token(line, "{") is not None) or (index_token(line, "}") is not None):
-        return ParseError('illegal delimiter', line)
+    if (index_token(line, "{", 'delimiter') is not None) \
+            or (index_token(line, "}", 'delimiter') is not None):
+        return ParseError("illegal delimiter", line)
 
-    # Third, parse operators.
-    # TODO
+    # Third, parse operators and application (concatenation).
+    for op, assoc, kind in Operators:
+        if assoc in ['left', 'right']:
+            while True:
+                if assoc == 'left':
+                    idx = index_token(line, op, 'operator')
+                if assoc == 'right':
+                    idx = rindex_token(line, op, 'operator')
+                if idx is None:
+                    break
+                if idx == 0:
+                    return ParseError("binary operator missing left argument", line)
+                if idx == len(line)-1:
+                    return ParseError("binary operator missing right argument", line)
+                lhs = line[idx-1]
+                rhs = line[idx+1]
+                if isinstance(lhs, Token) and lhs.cls not in ['natural', 'string', 'name']:
+                    return ParseError("invalid left argument", line)
+                if isinstance(rhs, Token) and rhs.cls not in ['natural', 'string', 'name']:
+                    return ParseError("invalid right argument", line)
+                tree = ParseTree(kind, [lhs, rhs])
+                line = line[:idx-1] + [tree] + line[idx+2:]
+
+        if assoc in ['prefix', 'postfix']:
+            while True:
+                if assoc == 'postfix':
+                    idx = index_token(line, op, 'operator')
+                if assoc == 'prefix':
+                    idx = rindex_token(line, op, 'operator')
+                if idx is None:
+                    break
+                if idx == 0 and assoc == 'postfix':
+                    return ParseError("postfix operator missing argument", line)
+                if idx == len(line)-1 and assoc == 'prefix':
+                    return ParseError("prefix operator missing argument", line)
+                if assoc == 'postfix':
+                    arg = line[idx-1]
+                if assoc == 'prefix':
+                    arg = line[idx+1]
+                if isinstance(arg, Token) and arg.cls not in ['natural', 'string', 'name']:
+                    return ParseError(f"invalid {assoc} argument", line)
+                tree = ParseTree(kind, [arg])
+                if assoc == 'postfix':
+                    line = line[:idx-1] + [tree] + line[idx+1:]
+                if assoc == 'prefix':
+                    line = line[:idx] + [tree] + line[idx+2:]
+
+    # Fourth, keyword functions.
+    while True:
+        idx = rindex_token(line, Keywords, 'keyword')
+        if idx is None:
+            break
+        if idx == len(line)-1:
+            return ParseError("keyword missing argument", line)
+        rhs = line[idx+1]
+        if isinstance(rhs, Token) and rhs.cls not in ['natural', 'string', 'name']:
+            return ParseError("invalid keyword argument", line)
+        tree = ParseTree(line[idx], [rhs])
+        line = line[:idx] + [tree] + line[idx+2:]
 
     # And we're all done!
+    if len(line) < 1:
+        raise Exception("this should never happen")
     if len(line) > 1:
-      return line   # TODO what should actually happen here?
+        return ParseError("undreducable expression", line)
 
     return line[0]
 
@@ -171,13 +246,27 @@ def parse_line(stream):
 ################################################################################
 
 
-def prompt():
-    print("queuen> ", end='')
-    return input() + "\n"
-
-stream = TokenStream("", prompt)
 if __name__ == "__main__":
-    while True:
-        ln = parse_line(stream)
-        print(ln)
+
+    from sys import exit
+
+    def prompt():
+        print("\x1B[2mqueuen>\x1B[22m ", end='')
+        line = input()
+        if line in ['exit', 'quit']:
+            exit()
+        return line + "\n"
+
+    stream = TokenStream("", prompt)
+
+    try:
+        while True:
+            ln = parse_line(stream)
+            print(ln)
+
+    except KeyboardInterrupt:
+        print("\b\bexit")
+
+    except EOFError:
+        print('exit')
 

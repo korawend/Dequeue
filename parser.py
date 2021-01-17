@@ -233,15 +233,15 @@ def _parse(line):
                 if idx is None:
                     break
                 if idx == 0:
-                    return ParseError("binary operator missing left argument", line[idx])
+                    return ParseError(f"binary operator {op} missing left argument", line[idx])
                 if idx == len(line)-1:
-                    return ParseError("binary operator missing right argument", line[idx])
+                    return ParseError(f"binary operator {op} missing right argument", line[idx])
                 lhs = line[idx-1]
                 rhs = line[idx+1]
                 if isinstance(lhs, Token) and lhs.cls not in AcceptableTokens:
-                    return ParseError("invalid left argument", lhs)
+                    return ParseError(f"invalid left argument for binary operator {op}", lhs)
                 if isinstance(rhs, Token) and rhs.cls not in AcceptableTokens:
-                    return ParseError("invalid right argument", rhs)
+                    return ParseError(f"invalid right argument for binary operator {op}", rhs)
                 tree = ParseTree(kind, [lhs, rhs])
                 line = line[:idx-1] + [tree] + line[idx+2:]
 
@@ -254,15 +254,15 @@ def _parse(line):
                 if idx is None:
                     break
                 if idx == 0 and assoc == 'postfix':
-                    return ParseError("postfix operator missing argument", line[idx])
+                    return ParseError(f"postfix operator {op} missing argument", line[idx])
                 if idx == len(line)-1 and assoc == 'prefix':
-                    return ParseError("prefix operator missing argument", line[idx])
+                    return ParseError(f"prefix operator {op} missing argument", line[idx])
                 if assoc == 'postfix':
                     arg = line[idx-1]
                 if assoc == 'prefix':
                     arg = line[idx+1]
                 if isinstance(arg, Token) and arg.cls not in AcceptableTokens:
-                    return ParseError(f"invalid {assoc} argument", arg)
+                    return ParseError(f"invalid argument for {assoc} operator {op}", arg)
                 tree = ParseTree(kind, [arg])
                 if assoc == 'postfix':
                     line = line[:idx-1] + [tree] + line[idx+1:]

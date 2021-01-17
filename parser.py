@@ -1,5 +1,4 @@
-from queuen.lexer import Token, TokenStream
-from queuen.lexer import KEYWORD as Keywords
+from lexer import Token, TokenStream
 
 # The token classes are  newline   ,  natural ,  string    ,
 #                        delimiter ,  special ,  separator ,  operator
@@ -86,9 +85,9 @@ def index_token(ln, val, cls):
     while idx < len(ln):
         obj = ln[idx]
         if isinstance(obj, Token):
-            setlike_cls = (isinstance(cls, set) or isinstance(cls, list))
+            setlike_cls = isinstance(cls, (set, list))
             if obj.cls == cls or (setlike_cls and obj.cls in cls):
-                setlike_val = (isinstance(val, set) or isinstance(val, list))
+                setlike_val = isinstance(val, (set, list))
                 if obj.val == val or (setlike_val and obj.val in val):
                     return idx
         idx += 1
@@ -100,9 +99,9 @@ def rindex_token(ln, val, cls):
     while idx >= 0:
         obj = ln[idx]
         if isinstance(obj, Token):
-            setlike_cls = (isinstance(cls, set) or isinstance(cls, list))
+            setlike_cls = isinstance(cls, (set, list))
             if obj.cls == cls or (setlike_cls and obj.cls in cls):
-                setlike_val = (isinstance(val, set) or isinstance(val, list))
+                setlike_val = isinstance(val, (set, list))
                 if obj.val == val or (setlike_val and obj.val in val):
                     return idx
         idx -= 1
@@ -136,10 +135,12 @@ AcceptableTokens = {'natural', 'string', 'name'}
 #   Each element looks like [op, 'left'|'right', kind]     for binary ops
 #                       and [op, 'prefix'|'postfix', kind] for unary ops
 #
-Operators = [[':', 'left',   'concat' ],
-             ['$', 'prefix', 'factory'],
+Operators = [['$', 'prefix', 'factory'],
+             ['_', 'prefix', 'flatten'],
              ['~', 'left',   'zip'    ],
-             ['_', 'prefix', 'flatten']]
+             ['+', 'left',   'concat' ]]
+
+Statements = {'print', 'printNum', 'printStr', 'printRepr'}
 
 # Returns None, an instance of ParseTree, or an instance of ParseError.
 #
@@ -268,18 +269,18 @@ def _parse(line):
                 if assoc == 'prefix':
                     line = line[:idx] + [tree] + line[idx+2:]
 
-    # Fourth, keyword functions.
-    while True:
-        idx = rindex_token(line, Keywords, 'keyword')
-        if idx is None:
-            break
-        if idx == len(line)-1:
-            return ParseError("keyword missing argument", line[idx])
-        rhs = line[idx+1]
-        if isinstance(rhs, Token) and rhs.cls not in AcceptableTokens:
-            return ParseError("invalid keyword argument", rhs)
-        tree = ParseTree(line[idx].val, [rhs])
-        line = line[:idx] + [tree] + line[idx+2:]
+    ## Fourth, keyword functions.
+    #while True:
+    #    idx = rindex_token(line, Keywords, 'keyword')
+    #    if idx is None:
+    #        break
+    #    if idx == len(line)-1:
+    #        return ParseError("keyword missing argument", line[idx])
+    #    rhs = line[idx+1]
+    #    if isinstance(rhs, Token) and rhs.cls not in AcceptableTokens:
+    #        return ParseError("invalid keyword argument", rhs)
+    #    tree = ParseTree(line[idx].val, [rhs])
+    #    line = line[:idx] + [tree] + line[idx+2:]
 
     # And we're all done!
     if len(line) < 1:
@@ -310,7 +311,7 @@ if __name__ == "__main__":
     from sys import exit
 
     def prompt():
-        print("\x1B[2mqueuen>\x1B[22m ", end='')
+        print("\x1B[2mparse>\x1B[22m ", end='')
         line = input()
         if line in ['exit', 'quit']:
             exit()

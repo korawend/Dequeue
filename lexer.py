@@ -1,6 +1,6 @@
 # Each of these can be sequence of alphabetic characters
 #
-KEYWORD = {'print', 'printNum', 'printStr', 'printRepr'}
+KEYWORD = {'print', 'printNum', 'printStr', 'printRepr', 'getNum', 'getStr'}
 
 # These must be only one character long.
 #

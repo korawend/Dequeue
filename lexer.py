@@ -203,7 +203,9 @@ class TokenStream:
 
                 literal = STRING_LEFT + string + STRING_RIGHT
                 string = string.replace('\\"', '"')
+                string = string.replace('\\n', '\n')
                 # TODO support other escape sequences
+                #      (and actually do it properly)
 
                 return Token(literal, tok_line, tok_column, string, 'string')
 

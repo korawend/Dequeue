@@ -197,15 +197,35 @@ def printNum(queue, out):
 
 
 def printStr(queue, out):
-    pass
+    while True:
+        try:
+            sub = queue.next()
+        except StopIteration:
+            out.write("\n")
+            break
+        n = 0
+        while True:
+            try:
+                sub.next()
+                n += 1
+            except StopIteration:
+                break
+        out.write(chr(n))
+
+
+def listify(queue):
+    lst = []
+    while True:
+        try:
+            elem = queue.next()
+            lst.append(listify(elem))
+        except StopIteration:
+            return lst
 
 
 def printRepr(queue, out):
-    pass
-
-
-def smartPrint(queue, out):
-    pass
+    out.write(str(listify(queue)))
+    out.write("\n")
 
 
 ################################################################################

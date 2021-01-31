@@ -138,6 +138,7 @@ AcceptableTokens = {'natural', 'string', 'name'}
 Operators = [['$', 'prefix', 'factory'],
              ['_', 'prefix', 'flatten'],
              ['~', 'left',   'zip'    ],
+             ['*', 'left',   'star'   ],
              ['+', 'left',   'concat' ]]
 
 Statements = {'print', 'printNum', 'printStr', 'printRepr'}
@@ -281,6 +282,9 @@ def _parse(line):
     #        return ParseError("invalid keyword argument", rhs)
     #    tree = ParseTree(line[idx].val, [rhs])
     #    line = line[:idx] + [tree] + line[idx+2:]
+
+    # Fourth, keyword functions. (getNum and getStr)
+    # Fifth, statements. (var := ... and print{Num|Str|Repr} ...)
 
     # And we're all done!
     if len(line) < 1:

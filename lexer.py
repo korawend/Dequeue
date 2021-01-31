@@ -145,6 +145,7 @@ class TokenStream:
                 continuation = self.more()
                 self.text += continuation
                 self.log  += continuation
+                continue
 
             # Is this a comment? ###########################################
             if self.text.startswith(COMMENT):
@@ -159,6 +160,7 @@ class TokenStream:
                     continuation = self.more()
                     self.text += continuation
                     self.log  += continuation
+                    continue
 
             ################################################################
             # At this point, we're guaranteed not to return a newline,

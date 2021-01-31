@@ -9,8 +9,24 @@ class Queue:
     def copy(self):
         pass
 
-    def next(self):
+    def __iter__(self):
+        return self
+
+    def __next__(self):
         pass
+
+    def __len__(self):
+        n = 0
+        while True:
+            try:
+                next(self)
+                n += 1
+            except StopIteration:
+                break
+        return n
+
+    def __repr__(self):
+        return "⟨\x1B[38;5;203mQueue\x1B[39m⟩"
 
 
 class Empty(Queue):
@@ -20,8 +36,11 @@ class Empty(Queue):
     def copy(self):
         return self
 
-    def next(self):
+    def __next__(self):
         raise StopIteration
+
+    def __repr__(self):
+        return "⟨\x1B[38;5;203mQueue\x1B[39m nil⟩"
 
 # For efficiency's sake, there's a single empty queue.
 Nil = Empty()
@@ -34,14 +53,18 @@ class Literal(Queue):
         self.index = 0
 
     def copy(self):
-        return Literal(self.list)
+        return Literal([q.copy() for q in self.list[self.index:]])
 
-    def next(self):
+    def __next__(self):
         if self.index < len(self.list):
             out = self.list[self.index]
             self.index += 1
             return out
         raise StopIteration
+
+    def __repr__(self):
+        q = "\x1B[38;5;203mQueue\x1B[39m"
+        return f"⟨{q} literal = {self.list}⟩"
 
 
 class Natural(Queue):
@@ -50,13 +73,17 @@ class Natural(Queue):
         self.index = 0
 
     def copy(self):
-        return Natural(self.value)
+        return Natural(self.value - self.index)
 
-    def next(self):
+    def __next__(self):
         if self.index < self.value:
             self.index += 1
             return Nil
         raise StopIteration
+
+    def __repr__(self):
+        q = "\x1B[38;5;203mQueue\x1B[39m"
+        return f"⟨{q} natural = {self.value}⟩"
 
 
 class String(Queue):
@@ -65,54 +92,83 @@ class String(Queue):
         self.index = 0
 
     def copy(self):
-        return String(self.value)
+        return String(self.value[self.index:])
 
-    def next(self):
+    def __next__(self):
         if self.index < len(self.value):
             out = Natural(ord(self.value[self.index]))
             self.index += 1
             return out
         raise StopIteration
 
+    def __repr__(self):
+        q = "\x1B[38;5;203mQueue\x1B[39m"
+        return f"⟨{q} string = {self.value}⟩"
 
-class Factory(Queue):
+
+class SafeFactory(Queue):
+    # A SafeFactory saves a copy of the template
+    #   and then returns duplicates of that.
     def __init__(self, queue):
-        # Should we instead make a copy of queue?
+        self.queue = queue.copy()
+
+    def copy(self):
+        return self
+
+    def __next__(self):
+        return self.queue.copy()
+
+    def __repr__(self):
+        q = "\x1B[38;5;203mQueue\x1B[39m"
+        return f"⟨{q} factory = {self.queue}⟩"
+
+
+class UnsafeFactory(Queue):
+    # An UnsafeFactory returns duplicates of
+    #   the template in its current state,
+    #   even if the template has changed.
+    def __init__(self, queue):
         self.queue = queue
 
     def copy(self):
-        return Factory(self.queue)
+        return self
 
-    def next(self):
+    def __next__(self):
         return self.queue.copy()
+
+    def __repr__(self):
+        q = "\x1B[38;5;203mQueue\x1B[39m"
+        return f"⟨{q} factory = {self.queue}⟩"
 
 
 class Concat(Queue):
     def __init__(self, fst, snd):
-        # Should we instead use copies of fst and snd?
         self.fst = fst
         self.snd = snd
 
     def copy(self):
-        return Concat(self.fst, self.snd)
+        return Concat(self.fst.copy(), self.snd.copy())
 
-    def next(self):
+    def __next__(self):
         try:
-            return self.fst.next()
+            return next(self.fst)
         except StopIteration:
-            return self.snd.next()
+            return next(self.snd)
+
+    def __repr__(self):
+        q = "\x1B[38;5;203mQueue\x1B[39m"
+        return f"⟨{q} concat = {self.fst} + {self.snd}⟩"
 
 
 class Zip(Queue):
     def __init__(self, fst, snd):
-        # Should we instead use copies of fst and snd?
         self.fst = fst
         self.snd = snd
 
     def copy(self):
-        return Zip(self.fst, self.snd)
+        return Zip(self.fst.copy(), self.snd.copy())
 
-    def next(self):
+    def __next__(self):
         # Instead of
         #
         #   try:
@@ -122,29 +178,57 @@ class Zip(Queue):
         #
         # we can just do
         #
-        out_fst = self.fst.next()
-        out_snd = self.snd.next()
+        out_fst = next(self.fst)
+        out_snd = next(self.snd)
         return Concat(out_fst, out_snd)
+
+    def __repr__(self):
+        q = "\x1B[38;5;203mQueue\x1B[39m"
+        return f"⟨{q} zip = {self.fst} ~ {self.snd}⟩"
 
 
 class Flatten(Queue):
     def __init__(self, queue):
-        # Should we instead use a copy of queue?
         self.queue = queue
         self.current = Nil
 
     def copy(self):
-        return Flatten(self.queue)
+        return Flatten(self.queue.copy())
 
-    def next(self):
+    def __next__(self):
         while True:
             try:
-                return self.current.next()
+                return next(self.current)
             except StopIteration:
                 # We intentionally don't catch any StopIteration
-                #   exceptions that self.queue.next() might throw,
+                #   exceptions that self.queue.__next__() might throw,
                 #   like we do in Zip's `next` method.
-                self.current = self.queue.next()
+                self.current = next(self.queue)
+
+    def __repr__(self):
+        q = "\x1B[38;5;203mQueue\x1B[39m"
+        return f"⟨{q} flatten = {self.queue}⟩"
+
+
+class Take(Queue):
+    # This kind of queue exists for debugging purposes
+
+    def __init__(self, queue, N):
+        self.queue = queue
+        self.index = N
+
+    def copy(self):
+        return Take(self.queue.copy(), self.index)
+
+    def __next__(self):
+        if self.index > 0:
+            self.index -= 1
+            return next(self.queue)
+        raise StopIteration
+
+    def __repr__(self):
+        q = "\x1B[38;5;203mQueue\x1B[39m"
+        return f"⟨{q} take = {self.queue}⟩"
 
 
 ################################################################################
@@ -159,7 +243,7 @@ def makeQueue(node):
         elif node.cls == "string":
             return String(node.val)
         else:
-            raise NotImplementedError
+            raise NotImplementedError(str(node))
 
     elif isinstance(node, ParseTree):
         if node.kind == "literal":
@@ -170,7 +254,7 @@ def makeQueue(node):
             return Concat(fst, snd)
         elif node.kind == "factory":
             queue = makeQueue(node.children[0])
-            return Factory(queue)
+            return SafeFactory(queue)
         elif node.kind == "zip":
             fst = makeQueue(node.children[0])
             snd = makeQueue(node.children[1])
@@ -178,54 +262,57 @@ def makeQueue(node):
         elif node.kind == "flatten":
             queue = makeQueue(node.children[0])
             return Flatten(queue)
+        elif node.kind == "star":
+            # a*b is syntactic sugar for _(b~$a)
+            fst = makeQueue(node.children[0])
+            snd = makeQueue(node.children[1])
+            return Flatten(Zip(snd, SafeFactory(fst)))
         else:
-            raise NotImplementedError
+            raise NotImplementedError(str(node))
 
 
 ################################################################################
 
 
+def listify(queue):
+    return [listify(elem) for elem in queue]
+
+
+def stirfry(queue):
+    pretty = ", ".join(stirfry(q) for q in queue)
+    return ("ε" if len(pretty) == 0 else "["+pretty+"]")
+
+
 def printNum(queue, out):
-    n = 0
-    while True:
-        try:
-            queue.next()
-            n += 1
-        except StopIteration:
-            break
-    out.write("%d\n" % n)
+    out.write("%d\n" % len(queue))
 
 
 def printStr(queue, out):
     while True:
         try:
-            sub = queue.next()
+            q = next(queue)
+            out.write(chr(len(q)))
         except StopIteration:
             out.write("\n")
             break
-        n = 0
-        while True:
-            try:
-                sub.next()
-                n += 1
-            except StopIteration:
-                break
-        out.write(chr(n))
-
-
-def listify(queue):
-    lst = []
-    while True:
-        try:
-            elem = queue.next()
-            lst.append(listify(elem))
-        except StopIteration:
-            return lst
 
 
 def printRepr(queue, out):
-    out.write(str(listify(queue)))
+    out.write(", ".join(stirfry(q) for q in queue) or "ε")
     out.write("\n")
+
+
+def smartPrint(queue, out):
+    lst = listify(queue)
+    if all(len(e) == 0 for e in lst):
+        out.write("%d\n" % len(lst))
+    elif all(len(s) > 0 and all(len(e)==0 for e in s) for s in lst):
+        out.write("".join(chr(len(s)) for s in lst))
+        out.write("\n")
+    else:
+        # since stirfry actually works on lists as well
+        out.write(", ".join(stirfry(e) for e in lst) or "ε")
+        out.write("\n")
 
 
 ################################################################################
@@ -247,11 +334,13 @@ def repl():
     try:
         while True:
             tree = parse_line(stream)
+            if tree is None:
+                continue
             if isinstance(tree, ParseError):
                 tree.display(stream.log)
                 continue
             q = makeQueue(tree)
-            printNum(q, stdout)
+            smartPrint(q, stdout)
 
     except KeyboardInterrupt:
         print("\b\b")

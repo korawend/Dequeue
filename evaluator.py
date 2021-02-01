@@ -353,7 +353,7 @@ def repl():
                 tree.display(stream.log)
                 continue
             q = makeQueue(tree)
-            fq = Take(q, 1024)
+            fq = Take(q, 1024*1024)
             smartPrint(fq, stdout)
             if fq.halted:
                 print("\x1B[93mwarning\x1B[39m: output truncated")

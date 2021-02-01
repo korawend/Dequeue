@@ -1,5 +1,15 @@
 from lexer import Token, TokenStream
 
+# For a fun example of the debug output, set DEBUG = True and then enter these
+#  literals at the prompt:
+#
+# [[[[[[], [[[]]], []], []], [[[[[], []]]], [[[[], [], [[]]], []]]], [[[]]]], []]]
+# [[[[], [[]], [[[[]], [], [[[[]], [], []]]]]], [[[[[]], []], [], [[[]]]], [[]]]]]
+# [[[], [[[], [[[[[]], [], []]]]], [], []]], [[[]], [[], []], [[], [], []]], []]
+#
+DEBUG = False
+
+
 # The token classes are  newline   ,  natural ,  string    ,
 #                        delimiter ,  special ,  separator ,  operator
 #                        keyword   ,  name
@@ -178,23 +188,49 @@ def _parse(line):
     # First, construct queue literals.
 
     while (lb := index_token(line, "[", 'delimiter')) is not None:
+        if DEBUG:
+            print("\x1B[2m"+str(len(line)).rjust(2)+"\x1B[22m", end="\x1B[G")
+            print("\x1B[" + str(line[lb].col+3) + "C1", end="\x1B[G")
         rb = index_token(line, "]", 'delimiter')
         if (rb is not None) and rb < lb:
             return ParseError("missing left bracket", line[rb])
+
+        elems = []
+        current_elem = []
         height = 1
         rb = lb + 1
         while True:
             if rb >= len(line):
+                if DEBUG:
+                    print()
                 return ParseError("missing right bracket", line[lb])
             obj = line[rb]
-            if isinstance(obj, Token) and obj.cls == 'delimiter':
-                if obj.val == '[': height += 1
-                if obj.val == ']': height -= 1
-            if height == 0: break
+            if height == 1 and isinstance(obj, Token) and obj.cls == 'separator' and obj.val == ',':
+                elems.append(current_elem)
+                current_elem = []
+            else:
+                if isinstance(obj, Token) and obj.cls == 'delimiter':
+                    if obj.val == '[': height += 1
+                    if obj.val == ']': height -= 1
+                    if DEBUG:
+                        print("\x1B[" + str(obj.col+3) + "C" + str(height), end="\x1B[G")
+                if height == 0: break
+                current_elem.append(obj)
             rb += 1
 
-        elems = split_token(line[lb+1:rb], ",")
+        elems.append(current_elem)
+
+        if DEBUG:
+            print()
+            print("\x1B[" + str(line[lb].col+3) + "C[", end="\x1B[G")
+            print("\x1B[" + str(line[rb].col+3) + "C]", end="\x1B[G")
+
         interior = []
+        if DEBUG:
+            for elem in elems:
+                if len(elem) > 0:
+                    print("\x1B[" + str(elem[0].col+3) + "C^", end="\x1B[G")
+            print()
         for elem in elems:
             parsed_elem = _parse(elem)
             if isinstance(parsed_elem, ParseError):

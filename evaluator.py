@@ -216,14 +216,23 @@ class Take(Queue):
     def __init__(self, queue, N):
         self.queue = queue
         self.index = N
+        self.halted = False
 
     def copy(self):
-        return Take(self.queue.copy(), self.index)
+        dup = Take(self.queue.copy(), self.index)
+        dup.halted = self.halted
+        return dup
 
     def __next__(self):
         if self.index > 0:
             self.index -= 1
             return next(self.queue)
+        # If there's nothing left in self.queue,
+        #   this will raise a StopIteration.
+        next(self.queue)
+        # If we get to here, though, self.queue
+        #   wasn't empty, meaning we stopped early.
+        self.halted = True
         raise StopIteration
 
     def __repr__(self):
@@ -283,6 +292,10 @@ def stirfry(queue):
     return ("ε" if len(pretty) == 0 else "["+pretty+"]")
 
 
+def zchr(n):
+    return (f"\x1B[2m^{chr(64+n)}\x1B[22m" if n < 28 else chr(n))
+
+
 def printNum(queue, out):
     out.write("%d\n" % len(queue))
 
@@ -291,7 +304,7 @@ def printStr(queue, out):
     while True:
         try:
             q = next(queue)
-            out.write(chr(len(q)))
+            out.write(zchr(len(q)))
         except StopIteration:
             out.write("\n")
             break
@@ -307,7 +320,7 @@ def smartPrint(queue, out):
     if all(len(e) == 0 for e in lst):
         out.write("%d\n" % len(lst))
     elif all(len(s) > 0 and all(len(e)==0 for e in s) for s in lst):
-        out.write("".join(chr(len(s)) for s in lst))
+        out.write("".join(zchr(len(s)) for s in lst))
         out.write("\n")
     else:
         # since stirfry actually works on lists as well
@@ -323,7 +336,7 @@ def repl():
     from sys import exit, stdout
 
     def prompt():
-        print("\x1B[2mqueuen>\x1B[22m ", end='')
+        print("\x1B[2mqn>\x1B[22m ", end='')
         line = input()
         if line in ['exit', 'quit']:
             exit()
@@ -340,7 +353,10 @@ def repl():
                 tree.display(stream.log)
                 continue
             q = makeQueue(tree)
-            smartPrint(q, stdout)
+            fq = Take(q, 1024)
+            smartPrint(fq, stdout)
+            if fq.halted:
+                print("\x1B[93mwarning\x1B[39m: output truncated")
 
     except KeyboardInterrupt:
         print("\b\b")
@@ -351,3 +367,4 @@ def repl():
 
 if __name__ == '__main__':
     repl()
+

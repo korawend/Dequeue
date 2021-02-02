@@ -242,7 +242,9 @@ class Take(Queue):
 
 ################################################################################
 
-# Token: 'natural', 'string'
+GLOBALS = {}
+
+# Token: 'natural', 'string', 'name', 'keyword'
 # ParseTree: 'literal', 'factory', 'flatten', 'zip', 'concat'
 
 def makeQueue(node):
@@ -251,6 +253,20 @@ def makeQueue(node):
             return Natural(node.val)
         elif node.cls == "string":
             return String(node.val)
+        elif node.cls == "name":
+            if node.val in GLOBALS:
+                return GLOBALS[node.val]
+            else:
+                return Nil
+        elif node.cls == "keyword":
+            if node.val == 'get':
+                return Natural(1)       # TODO
+            elif node.val == 'getNum':
+                return Natural(1)       # TODO
+            elif node.val == 'getStr':
+                return Natural(1)       # TODO
+            else:
+                return Nil
         else:
             raise NotImplementedError(str(node))
 
@@ -319,7 +335,7 @@ def smartPrint(queue, out):
     lst = listify(queue)
     if all(len(e) == 0 for e in lst):
         out.write("%d\n" % len(lst))
-    elif all(len(s) > 0 and all(len(e)==0 for e in s) for s in lst):
+    elif all(len(s) > 0 and len(s) < 128 and all(len(e)==0 for e in s) for s in lst):
         out.write("".join(zchr(len(s)) for s in lst))
         out.write("\n")
     else:
@@ -347,16 +363,39 @@ def repl():
     try:
         while True:
             tree = parse_line(stream)
+
             if tree is None:
                 continue
+
             if isinstance(tree, ParseError):
                 tree.display(stream.log)
                 continue
-            q = makeQueue(tree)
-            fq = Take(q, 1024*1024)
-            smartPrint(fq, stdout)
-            if fq.halted:
-                print("\x1B[93mwarning\x1B[39m: output truncated")
+
+            if isinstance(tree, ParseTree) and tree.kind == 'assignment':
+                name = tree.children[0].val
+                q = makeQueue(tree.children[1])
+                GLOBALS[name] = q
+
+            elif isinstance(tree, ParseTree) and tree.kind == 'output':
+                cmd = tree.children[0].val
+                q = makeQueue(tree.children[1])
+                if cmd == 'print':
+                    smartPrint(q, stdout)
+                elif cmd == 'printNum':
+                    printNum(q, stdout)
+                elif cmd == 'printStr':
+                    printStr(q, stdout)
+                elif cmd == 'printRepr':
+                    printRepr(q, stdout)
+                else:
+                    raise Exception("this should never happen")
+
+            else:
+                q = makeQueue(tree)
+                fq = Take(q, 1024*1024)
+                smartPrint(fq, stdout)
+                if fq.halted:
+                    print("\x1B[93mwarning\x1B[39m: output truncated")
 
     except KeyboardInterrupt:
         print("\b\b")

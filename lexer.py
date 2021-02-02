@@ -1,6 +1,6 @@
 # Each of these can be sequence of alphabetic characters
 #
-KEYWORD = {'print', 'printNum', 'printStr', 'printRepr', 'getNum', 'getStr'}
+KEYWORD = {'print', 'printNum', 'printStr', 'printRepr', 'get', 'getNum', 'getStr'}
 
 # These must be only one character long.
 #
@@ -28,6 +28,7 @@ OPERATOR = {'!',  '@',  '$',  '%',  '^',  '&',  '*',  '-',  '+',  '|',  '_',
            #'<<',  '>>',  '..',  '==', '::', '??', '//', '\\\\',
            #              '.=',        ':=', '?=', '/=', '\\=',  '~=',
            #'<<<', '>>>', '...', '===',
+                                       ':=',
 
            #'/\\', '\\/', '<>', '</>', '<:', ':>', '<-<', '>->',
            #                    '=/=', '<~', '~>',
@@ -63,7 +64,7 @@ NON_WORD = ( (DELIMITER | SPECIAL | SEPARATOR | OPERATOR_START
              ) - MID_WORD_SYMBOL
            ) | END_WORD_SYMBOL | WHITESPACE
 
-SORTED_OPERATOR = reversed(sorted(OPERATOR, key = len))
+SORTED_OPERATOR = list(reversed(sorted(OPERATOR, key = len)))
 
 import re
 ws_regex  = re.compile(r"\s+")
@@ -149,18 +150,19 @@ class TokenStream:
 
             # Is this a comment? ###########################################
             if self.text.startswith(COMMENT):
-                try:
-                    end_of_comment = self.text.index("\n")
-                    self.text = self.text[end_of_comment:]
-                    continue
-                except Exception:
-                    self.text = ""
-                    if self.more is None:
-                        return None
-                    continuation = self.more()
-                    self.text += continuation
-                    self.log  += continuation
-                    continue
+                while True:
+                    try:
+                        end_of_comment = self.text.index("\n")
+                        self.text = self.text[end_of_comment:]
+                        break
+                    except Exception:
+                        self.text = ""
+                        if self.more is None:
+                            return None
+                        continuation = self.more()
+                        self.text += continuation
+                        self.log  += continuation
+                continue
 
             ################################################################
             # At this point, we're guaranteed not to return a newline,
@@ -173,7 +175,7 @@ class TokenStream:
             # TODO support 0x, 0o, and 0b notation
             match = num_regex.match(self.text)
             if match is not None:
-                numstr= match.group()
+                numstr = match.group()
                 num = int(numstr)
                 self._advance(numstr)
                 self.text = self.text[match.end():]

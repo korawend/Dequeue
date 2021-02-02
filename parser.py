@@ -42,7 +42,7 @@ class ParseError:
         self.message   = msg        # instance of str
         self.highlight = hi         # instance of ParseTree or Token,
                                     #   or a list of ParseTrees and Tokens
-        self.redux     = redux      # whether this is a reducability error
+        self.redux     = redux      # whether this is a reducibility error
 
     def __repr__(self):
         return "\x1B[91merror\x1B[39m: " + self.message
@@ -138,7 +138,7 @@ def split_token(ln, val, cls = 'separator'):
 
 # These are acceptable arguments to operators and built-ins.
 #
-AcceptableTokens = {'natural', 'string', 'name'}
+AcceptableTokens = {'natural', 'string', 'name', 'keyword'}
 
 
 # Arranged from high to low precedence.
@@ -151,11 +151,12 @@ Operators = [['$', 'prefix', 'factory'],
              ['*', 'left',   'star'   ],
              ['+', 'left',   'concat' ]]
 
-Statements = {'print', 'printNum', 'printStr', 'printRepr'}
+Input  = {'get', 'getNum', 'getStr'}
+Output = {'print', 'printNum', 'printStr', 'printRepr'}
 
 # Returns None, an instance of ParseTree, or an instance of ParseError.
 #
-def _parse(line):
+def _parse(line, statement=False):
 
     if len(line) == 0:
         return None
@@ -306,29 +307,40 @@ def _parse(line):
                 if assoc == 'prefix':
                     line = line[:idx] + [tree] + line[idx+2:]
 
-    ## Fourth, keyword functions.
-    #while True:
-    #    idx = rindex_token(line, Keywords, 'keyword')
-    #    if idx is None:
-    #        break
-    #    if idx == len(line)-1:
-    #        return ParseError("keyword missing argument", line[idx])
-    #    rhs = line[idx+1]
-    #    if isinstance(rhs, Token) and rhs.cls not in AcceptableTokens:
-    #        return ParseError("invalid keyword argument", rhs)
-    #    tree = ParseTree(line[idx].val, [rhs])
-    #    line = line[:idx] + [tree] + line[idx+2:]
-
-    # Fourth, keyword functions. (getNum and getStr)
-    # Fifth, statements. (var := ... and print{Num|Str|Repr} ...)
-
     # And we're all done!
     if len(line) < 1:
         raise Exception("this should never happen")
-    if len(line) > 1:
-        return ParseError("undreducable expression", line, True)
 
-    return line[0]
+    # Unless this is a statement.
+    if statement:
+        # Statments look like one of
+        #   <name> := <tree|token>      # assignment
+        #   <output> <tree|token>       # output
+        #   <tree|token>                # implicit print
+        if len(line) == 1:
+            okay = not (isinstance(line[0], Token) and line[0].val in Output)
+            if okay:
+                return line[0]
+
+        if len(line) == 2:
+            okay = isinstance(line[0], Token) and line[0].val in Output and \
+                   not (isinstance(line[1], Token) and line[1].val in Output)
+            if okay:
+                return ParseTree('output', line)
+
+        if len(line) == 3:
+            okay = isinstance(line[0], Token) and line[0].cls == 'name' and \
+                   isinstance(line[1], Token) and line[1].val == ':='
+            if okay:
+                return ParseTree('assignment', line[0::2])
+
+        return ParseError("not a statement or reducible expression", line, True)
+
+    # And if it's not a statement...
+    if len(line) > 1:
+        return ParseError("undreducible expression", line, True)
+    else:
+        return line[0]
 
 
 def parse_line(stream):
@@ -340,7 +352,7 @@ def parse_line(stream):
             break
         line.append(tok)
 
-    return _parse(line)
+    return _parse(line, True)
 
 
 ################################################################################

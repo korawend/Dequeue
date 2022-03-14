@@ -352,7 +352,7 @@ def repl():
     from sys import exit, stdout
 
     def prompt():
-        print("\x1B[2mqn>\x1B[22m ", end='')
+        print("\x1B[2mdq>\x1B[22m ", end='')
         line = input()
         if line in ['exit', 'quit']:
             exit()

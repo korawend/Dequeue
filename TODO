@@ -1,0 +1,5 @@
+the TAKE operator
+
+  ^x    is syntactic sugar for    _(1~x)
+
+  so that   ^$y   becomes   _(1~$y)   becomes    y

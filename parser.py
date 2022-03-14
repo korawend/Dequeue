@@ -307,11 +307,16 @@ def _parse(line, statement=False):
                 if assoc == 'prefix':
                     line = line[:idx] + [tree] + line[idx+2:]
 
+    # Only ParseTrees and natural, string, keyword, name, and ":=" tokens should
+    #   be left. Newlines, delimiters, specials, separators, and operators other
+    #   than ":=" are illegal at this point.
+    # TODO
+
     # And we're all done!
     if len(line) < 1:
         raise Exception("this should never happen")
 
-    # Unless this is a statement.
+    # ...unless this is a statement.
     if statement:
         # Statments look like one of
         #   <name> := <tree|token>      # assignment
